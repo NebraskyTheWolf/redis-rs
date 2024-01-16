@@ -30,34 +30,24 @@ macro_rules! implement_json_commands {
         /// For instance this code:
         ///
         /// ```rust,no_run
-        /// use redis::JsonCommands;
-        /// use serde_json::json;
         /// # fn do_something() -> redis::RedisResult<()> {
         /// let client = redis::Client::open("redis://127.0.0.1/")?;
         /// let mut con = client.get_connection()?;
-        /// redis::cmd("JSON.SET").arg("my_key").arg("$").arg(&json!({"item": 42i32}).to_string()).execute(&mut con);
-        /// assert_eq!(redis::cmd("JSON.GET").arg("my_key").arg("$").query(&mut con), Ok(String::from(r#"[{"item":42}]"#)));
+        /// redis::cmd("SET").arg("my_key").arg(42).execute(&mut con);
+        /// assert_eq!(redis::cmd("GET").arg("my_key").query(&mut con), Ok(42));
         /// # Ok(()) }
         /// ```
         ///
         /// Will become this:
         ///
         /// ```rust,no_run
-        /// use redis::JsonCommands;
-        /// use serde_json::json;
         /// # fn do_something() -> redis::RedisResult<()> {
+        /// use redis::Commands;
         /// let client = redis::Client::open("redis://127.0.0.1/")?;
         /// let mut con = client.get_connection()?;
-        /// con.json_set("my_key", "$", &json!({"item": 42i32}).to_string())?;
-        /// assert_eq!(con.json_get("my_key", "$"), Ok(String::from(r#"[{"item":42}]"#)));
-        /// assert_eq!(con.json_get("my_key", "$.item"), Ok(String::from(r#"[42]"#)));
+        /// con.set("my_key", 42)?;
+        /// assert_eq!(con.get("my_key"), Ok(42));
         /// # Ok(()) }
-        /// ```
-        /// 
-        /// With RedisJSON commands, you have to note that all results will be wrapped
-        /// in square brackets (or empty brackets if not found). If you want to deserialize it
-        /// with e.g. `serde_json` you have to use `Vec<T>` for your output type instead of `T`.
-        /// 
         /// ```
         pub trait JsonCommands : ConnectionLike + Sized {
             $(
@@ -88,12 +78,11 @@ macro_rules! implement_json_commands {
         ///
         /// ```rust,no_run
         /// use redis::JsonAsyncCommands;
-        /// use serde_json::json;
         /// # async fn do_something() -> redis::RedisResult<()> {
         /// let client = redis::Client::open("redis://127.0.0.1/")?;
         /// let mut con = client.get_async_connection().await?;
-        /// redis::cmd("JSON.SET").arg("my_key").arg("$").arg(&json!({"item": 42i32}).to_string()).query_async(&mut con).await?;
-        /// assert_eq!(redis::cmd("JSON.GET").arg("my_key").arg("$").query_async(&mut con).await, Ok(String::from(r#"[{"item":42}]"#)));
+        /// redis::cmd("SET").arg("my_key").arg(42i32).query_async(&mut con).await?;
+        /// assert_eq!(redis::cmd("GET").arg("my_key").query_async(&mut con).await, Ok(42i32));
         /// # Ok(()) }
         /// ```
         ///
@@ -101,21 +90,15 @@ macro_rules! implement_json_commands {
         ///
         /// ```rust,no_run
         /// use redis::JsonAsyncCommands;
-        /// use serde_json::json;
+		/// use serde_json::json;
         /// # async fn do_something() -> redis::RedisResult<()> {
         /// use redis::Commands;
         /// let client = redis::Client::open("redis://127.0.0.1/")?;
         /// let mut con = client.get_async_connection().await?;
-        /// con.json_set("my_key", "$", &json!({"item": 42i32}).to_string()).await?;
+        /// con.json_set("my_key", "$", &json!({"item": 42i32})).await?;
         /// assert_eq!(con.json_get("my_key", "$").await, Ok(String::from(r#"[{"item":42}]"#)));
-        /// assert_eq!(con.json_get("my_key", "$.item").await, Ok(String::from(r#"[42]"#)));
         /// # Ok(()) }
         /// ```
-        /// 
-        /// With RedisJSON commands, you have to note that all results will be wrapped
-        /// in square brackets (or empty brackets if not found). If you want to deserialize it
-        /// with e.g. `serde_json` you have to use `Vec<T>` for your output type instead of `T`.
-        /// 
 		#[cfg(feature = "aio")]
         pub trait JsonAsyncCommands : crate::aio::ConnectionLike + Send + Sized {
             $(
@@ -291,10 +274,6 @@ implement_json_commands! {
     /// Gets JSON Value(s) at `path`.
     ///
     /// Runs `JSON.GET` is key is singular, `JSON.MGET` if there are multiple keys.
-    ///         
-    /// With RedisJSON commands, you have to note that all results will be wrapped
-    /// in square brackets (or empty brackets if not found). If you want to deserialize it
-    /// with e.g. `serde_json` you have to use `Vec<T>` for your output type instead of `T`. 
     fn json_get<K: ToRedisArgs, P: ToRedisArgs>(key: K, path: P) {
         let mut cmd = cmd(if key.is_single_arg() { "JSON.GET" } else { "JSON.MGET" });
 

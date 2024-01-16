@@ -144,7 +144,6 @@ where
                             "CROSSSLOT" => ErrorKind::CrossSlot,
                             "MASTERDOWN" => ErrorKind::MasterDown,
                             "READONLY" => ErrorKind::ReadOnly,
-                            "NOTBUSY" => ErrorKind::NotBusy,
                             code => return make_extension_error(code, pieces.next()),
                         };
                         match pieces.next() {

@@ -3,7 +3,7 @@
 use crate::cmd::{cmd, Cmd, Iter};
 use crate::connection::{Connection, ConnectionLike, Msg};
 use crate::pipeline::Pipeline;
-use crate::types::{FromRedisValue, NumericBehavior, RedisResult, ToRedisArgs, RedisWrite, Expiry, SetExpiry, ExistenceCheck};
+use crate::types::{FromRedisValue, NumericBehavior, RedisResult, ToRedisArgs, RedisWrite, Expiry};
 
 #[macro_use]
 mod macros;
@@ -34,7 +34,32 @@ use crate::acl;
 pub(crate) fn is_readonly_cmd(cmd: &[u8]) -> bool {
     matches!(
         cmd,
-        b"BITCOUNT" | b"BITFIELD_RO" | b"BITPOS" | b"DBSIZE" | b"DUMP" | b"EVALSHA_RO" | b"EVAL_RO" | b"EXISTS" | b"EXPIRETIME" | b"FCALL_RO" | b"GEODIST" | b"GEOHASH" | b"GEOPOS" | b"GEORADIUSBYMEMBER_RO" | b"GEORADIUS_RO" | b"GEOSEARCH" | b"GET" | b"GETBIT" | b"GETRANGE" | b"HEXISTS" | b"HGET" | b"HGETALL" | b"HKEYS" | b"HLEN" | b"HMGET" | b"HRANDFIELD" | b"HSCAN" | b"HSTRLEN" | b"HVALS" | b"KEYS" | b"LCS" | b"LINDEX" | b"LLEN" | b"LOLWUT" | b"LPOS" | b"LRANGE" | b"MEMORY USAGE" | b"MGET" | b"OBJECT ENCODING" | b"OBJECT FREQ" | b"OBJECT IDLETIME" | b"OBJECT REFCOUNT" | b"PEXPIRETIME" | b"PFCOUNT" | b"PTTL" | b"RANDOMKEY" | b"SCAN" | b"SCARD" | b"SDIFF" | b"SINTER" | b"SINTERCARD" | b"SISMEMBER" | b"SMEMBERS" | b"SMISMEMBER" | b"SORT_RO" | b"SRANDMEMBER" | b"SSCAN" | b"STRLEN" | b"SUBSTR" | b"SUNION" | b"TOUCH" | b"TTL" | b"TYPE" | b"XINFO CONSUMERS" | b"XINFO GROUPS" | b"XINFO STREAM" | b"XLEN" | b"XPENDING" | b"XRANGE" | b"XREAD" | b"XREVRANGE" | b"ZCARD" | b"ZCOUNT" | b"ZDIFF" | b"ZINTER" | b"ZINTERCARD" | b"ZLEXCOUNT" | b"ZMSCORE" | b"ZRANDMEMBER" | b"ZRANGE" | b"ZRANGEBYLEX" | b"ZRANGEBYSCORE" | b"ZRANK" | b"ZREVRANGE" | b"ZREVRANGEBYLEX" | b"ZREVRANGEBYSCORE" | b"ZREVRANK" | b"ZSCAN" | b"ZSCORE" | b"ZUNION"
+        // @admin
+        b"LASTSAVE" |
+        // @bitmap
+        b"BITCOUNT" | b"BITFIELD_RO" | b"BITPOS" | b"GETBIT" |
+        // @connection
+        b"CLIENT" | b"ECHO" |
+        // @geo
+        b"GEODIST" | b"GEOHASH" | b"GEOPOS" | b"GEORADIUSBYMEMBER_RO" | b"GEORADIUS_RO" | b"GEOSEARCH" |
+        // @hash
+        b"HEXISTS" | b"HGET" | b"HGETALL" | b"HKEYS" | b"HLEN" | b"HMGET" | b"HRANDFIELD" | b"HSCAN" | b"HSTRLEN" | b"HVALS" |
+        // @hyperloglog
+        b"PFCOUNT" |
+        // @keyspace
+        b"DBSIZE" | b"DUMP" | b"EXISTS" | b"EXPIRETIME" | b"KEYS" | b"OBJECT" | b"PEXPIRETIME" | b"PTTL" | b"RANDOMKEY" | b"SCAN" | b"TOUCH" | b"TTL" | b"TYPE" |
+        // @list
+        b"LINDEX" | b"LLEN" | b"LPOS" | b"LRANGE" | b"SORT_RO" |
+        // @scripting
+        b"EVALSHA_RO" | b"EVAL_RO" | b"FCALL_RO" |
+        // @set
+        b"SCARD" | b"SDIFF" | b"SINTER" | b"SINTERCARD" | b"SISMEMBER" | b"SMEMBERS" | b"SMISMEMBER" | b"SRANDMEMBER" | b"SSCAN" | b"SUNION" |
+        // @sortedset
+        b"ZCARD" | b"ZCOUNT" | b"ZDIFF" | b"ZINTER" | b"ZINTERCARD" | b"ZLEXCOUNT" | b"ZMSCORE" | b"ZRANDMEMBER" | b"ZRANGE" | b"ZRANGEBYLEX" | b"ZRANGEBYSCORE" | b"ZRANK" | b"ZREVRANGE" | b"ZREVRANGEBYLEX" | b"ZREVRANGEBYSCORE" | b"ZREVRANK" | b"ZSCAN" | b"ZSCORE" | b"ZUNION" |
+        // @stream
+        b"XINFO" | b"XLEN" | b"XPENDING" | b"XRANGE" | b"XREAD" | b"XREVRANGE" |
+        // @string
+        b"GET" | b"GETRANGE" | b"LCS" | b"MGET" | b"STRALGO" | b"STRLEN" | b"SUBSTR"
     )
 }
 
@@ -62,11 +87,6 @@ implement_commands! {
         cmd("SET").arg(key).arg(value)
     }
 
-    /// Set the string value of a key with options.
-    fn set_options<K: ToRedisArgs, V: ToRedisArgs>(key: K, value: V, options: SetOptions) {
-        cmd("SET").arg(key).arg(value).arg(options)
-    }
-
     /// Sets multiple keys to their values.
     #[allow(deprecated)]
     #[deprecated(since = "0.22.4", note = "Renamed to mset() to reflect Redis name")]
@@ -80,12 +100,12 @@ implement_commands! {
     }
 
     /// Set the value and expiration of a key.
-    fn set_ex<K: ToRedisArgs, V: ToRedisArgs>(key: K, value: V, seconds: u64) {
+    fn set_ex<K: ToRedisArgs, V: ToRedisArgs>(key: K, value: V, seconds: usize) {
         cmd("SETEX").arg(key).arg(seconds).arg(value)
     }
 
     /// Set the value and expiration in milliseconds of a key.
-    fn pset_ex<K: ToRedisArgs, V: ToRedisArgs>(key: K, value: V, milliseconds: u64) {
+    fn pset_ex<K: ToRedisArgs, V: ToRedisArgs>(key: K, value: V, milliseconds: usize) {
         cmd("PSETEX").arg(key).arg(milliseconds).arg(value)
     }
 
@@ -124,28 +144,23 @@ implement_commands! {
         cmd("EXISTS").arg(key)
     }
 
-    /// Determine the type of a key.
-    fn key_type<K: ToRedisArgs>(key: K) {
-        cmd("TYPE").arg(key)
-    }
-
     /// Set a key's time to live in seconds.
-    fn expire<K: ToRedisArgs>(key: K, seconds: i64) {
+    fn expire<K: ToRedisArgs>(key: K, seconds: usize) {
         cmd("EXPIRE").arg(key).arg(seconds)
     }
 
     /// Set the expiration for a key as a UNIX timestamp.
-    fn expire_at<K: ToRedisArgs>(key: K, ts: i64) {
+    fn expire_at<K: ToRedisArgs>(key: K, ts: usize) {
         cmd("EXPIREAT").arg(key).arg(ts)
     }
 
     /// Set a key's time to live in milliseconds.
-    fn pexpire<K: ToRedisArgs>(key: K, ms: i64) {
+    fn pexpire<K: ToRedisArgs>(key: K, ms: usize) {
         cmd("PEXPIRE").arg(key).arg(ms)
     }
 
     /// Set the expiration for a key as a UNIX timestamp in milliseconds.
-    fn pexpire_at<K: ToRedisArgs>(key: K, ts: i64) {
+    fn pexpire_at<K: ToRedisArgs>(key: K, ts: usize) {
         cmd("PEXPIREAT").arg(key).arg(ts)
     }
 
@@ -333,29 +348,29 @@ implement_commands! {
 
     /// Pop an element from a list, push it to another list
     /// and return it; or block until one is available
-    fn blmove<S: ToRedisArgs, D: ToRedisArgs>(srckey: S, dstkey: D, src_dir: Direction, dst_dir: Direction, timeout: f64) {
+    fn blmove<S: ToRedisArgs, D: ToRedisArgs>(srckey: S, dstkey: D, src_dir: Direction, dst_dir: Direction, timeout: usize) {
         cmd("BLMOVE").arg(srckey).arg(dstkey).arg(src_dir).arg(dst_dir).arg(timeout)
     }
 
     /// Pops `count` elements from the first non-empty list key from the list of
     /// provided key names; or blocks until one is available.
-    fn blmpop<K: ToRedisArgs>(timeout: f64, numkeys: usize, key: K, dir: Direction, count: usize){
+    fn blmpop<K: ToRedisArgs>(timeout: usize, numkeys: usize, key: K, dir: Direction, count: usize){
         cmd("BLMPOP").arg(timeout).arg(numkeys).arg(key).arg(dir).arg("COUNT").arg(count)
     }
 
     /// Remove and get the first element in a list, or block until one is available.
-    fn blpop<K: ToRedisArgs>(key: K, timeout: f64) {
+    fn blpop<K: ToRedisArgs>(key: K, timeout: usize) {
         cmd("BLPOP").arg(key).arg(timeout)
     }
 
     /// Remove and get the last element in a list, or block until one is available.
-    fn brpop<K: ToRedisArgs>(key: K, timeout: f64) {
+    fn brpop<K: ToRedisArgs>(key: K, timeout: usize) {
         cmd("BRPOP").arg(key).arg(timeout)
     }
 
     /// Pop a value from a list, push it to another list and return it;
     /// or block until one is available.
-    fn brpoplpush<S: ToRedisArgs, D: ToRedisArgs>(srckey: S, dstkey: D, timeout: f64) {
+    fn brpoplpush<S: ToRedisArgs, D: ToRedisArgs>(srckey: S, dstkey: D, timeout: usize) {
         cmd("BRPOPLPUSH").arg(srckey).arg(dstkey).arg(timeout)
     }
 
@@ -497,9 +512,9 @@ implement_commands! {
         cmd("SISMEMBER").arg(key).arg(member)
     }
 
-    /// Determine if given values are members of a set.
-    fn smismember<K: ToRedisArgs, M: ToRedisArgs>(key: K, members: M) {
-        cmd("SMISMEMBER").arg(key).arg(members)
+    /// Determine if multiple values are members of a set.
+    fn smismember<K: ToRedisArgs, M: ToRedisArgs>(key: K, member: M) {
+        cmd("SMISMEMBER").arg(key).arg(member)
     }
 
     /// Get all the members in a set.
@@ -592,7 +607,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zinterstore_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZINTERSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("WEIGHTS").arg(weights)
     }
 
@@ -600,7 +615,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zinterstore_min_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZINTERSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("AGGREGATE").arg("MIN").arg("WEIGHTS").arg(weights)
     }
 
@@ -608,7 +623,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zinterstore_max_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZINTERSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("AGGREGATE").arg("MAX").arg("WEIGHTS").arg(weights)
     }
 
@@ -617,21 +632,9 @@ implement_commands! {
         cmd("ZLEXCOUNT").arg(key).arg(min).arg(max)
     }
 
-    /// Removes and returns the member with the highest score in a sorted set.
-    /// Blocks until a member is available otherwise.
-    fn bzpopmax<K: ToRedisArgs>(key: K, timeout: f64) {
-        cmd("BZPOPMAX").arg(key).arg(timeout)
-    }
-
     /// Removes and returns up to count members with the highest scores in a sorted set
     fn zpopmax<K: ToRedisArgs>(key: K, count: isize) {
         cmd("ZPOPMAX").arg(key).arg(count)
-    }
-
-    /// Removes and returns the member with the lowest score in a sorted set.
-    /// Blocks until a member is available otherwise.
-    fn bzpopmin<K: ToRedisArgs>(key: K, timeout: f64) {
-        cmd("BZPOPMIN").arg(key).arg(timeout)
     }
 
     /// Removes and returns up to count members with the lowest scores in a sorted set
@@ -641,22 +644,8 @@ implement_commands! {
 
     /// Removes and returns up to count members with the highest scores,
     /// from the first non-empty sorted set in the provided list of key names.
-    /// Blocks until a member is available otherwise.
-    fn bzmpop_max<K: ToRedisArgs>(timeout: f64, keys: &'a [K], count: isize) {
-        cmd("BZMPOP").arg(timeout).arg(keys.len()).arg(keys).arg("MAX").arg("COUNT").arg(count)
-    }
-
-    /// Removes and returns up to count members with the highest scores,
-    /// from the first non-empty sorted set in the provided list of key names.
     fn zmpop_max<K: ToRedisArgs>(keys: &'a [K], count: isize) {
         cmd("ZMPOP").arg(keys.len()).arg(keys).arg("MAX").arg("COUNT").arg(count)
-    }
-
-    /// Removes and returns up to count members with the lowest scores,
-    /// from the first non-empty sorted set in the provided list of key names.
-    /// Blocks until a member is available otherwise.
-    fn bzmpop_min<K: ToRedisArgs>(timeout: f64, keys: &'a [K], count: isize) {
-        cmd("BZMPOP").arg(timeout).arg(keys.len()).arg(keys).arg("MIN").arg("COUNT").arg(count)
     }
 
     /// Removes and returns up to count members with the lowest scores,
@@ -829,7 +818,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zunionstore_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZUNIONSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("WEIGHTS").arg(weights)
     }
 
@@ -837,7 +826,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zunionstore_min_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZUNIONSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("AGGREGATE").arg("MIN").arg("WEIGHTS").arg(weights)
     }
 
@@ -845,7 +834,7 @@ implement_commands! {
     /// multiplication factor for each sorted set by pairing one with each key
     /// in a tuple.
     fn zunionstore_max_weights<D: ToRedisArgs, K: ToRedisArgs, W: ToRedisArgs>(dstkey: D, keys: &'a [(K, W)]) {
-        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight):&(K, W)| -> (&K, &W) {(key, weight)}).unzip();
+        let (keys, weights): (Vec<&K>, Vec<&W>) = keys.iter().map(|(key, weight)| (key, weight)).unzip();
         cmd("ZUNIONSTORE").arg(dstkey).arg(keys.len()).arg(keys).arg("AGGREGATE").arg("MAX").arg("WEIGHTS").arg(weights)
     }
 
@@ -1791,7 +1780,7 @@ implement_commands! {
     ///     STREAMS key_1 key_2 ... key_N
     ///     ID_1 ID_2 ... ID_N
     ///
-    /// XREADGROUP [GROUP group-name consumer-name] [BLOCK <milliseconds>] [COUNT <count>] [NOACK] 
+    /// XREADGROUP [BLOCK <milliseconds>] [COUNT <count>] [NOACK] [GROUP group-name consumer-name]
     ///     STREAMS key_1 key_2 ... key_N
     ///     ID_1 ID_2 ... ID_N
     /// ```
@@ -2078,93 +2067,5 @@ impl ToRedisArgs for Direction {
             Direction::Right => b"RIGHT",
         };
         out.write_arg(s);
-    }
-}
-
-/// Options for the [SET](https://redis.io/commands/set) command
-///
-/// # Example
-/// ```rust,no_run
-/// use redis::{Commands, RedisResult, SetOptions, SetExpiry, ExistenceCheck};
-/// fn set_key_value(
-///     con: &mut redis::Connection,
-///     key: &str,
-///     value: &str,
-/// ) -> RedisResult<Vec<usize>> {
-///     let opts = SetOptions::default()
-///         .conditional_set(ExistenceCheck::NX)
-///         .get(true)
-///         .with_expiration(SetExpiry::EX(60));
-///     con.set_options(key, value, opts)
-/// }
-/// ```
-#[derive(Default)]
-pub struct SetOptions {
-    conditional_set: Option<ExistenceCheck>,
-    get: bool,
-    expiration: Option<SetExpiry>,
-}
-
-impl SetOptions {
-    /// Set the existence check for the SET command
-    pub fn conditional_set(mut self, existence_check: ExistenceCheck) -> Self {
-        self.conditional_set = Some(existence_check);
-        self
-    }
-
-    /// Set the GET option for the SET command
-    pub fn get(mut self, get: bool) -> Self {
-        self.get = get;
-        self
-    }
-
-    /// Set the expiration for the SET command
-    pub fn with_expiration(mut self, expiration: SetExpiry) -> Self {
-        self.expiration = Some(expiration);
-        self
-    }
-}
-
-impl ToRedisArgs for SetOptions {
-    fn write_redis_args<W>(&self, out: &mut W)
-    where
-        W: ?Sized + RedisWrite,
-    {
-        if let Some(ref conditional_set) = self.conditional_set {
-            match conditional_set {
-                ExistenceCheck::NX => {
-                    out.write_arg(b"NX");
-                }
-                ExistenceCheck::XX => {
-                    out.write_arg(b"XX");
-                }
-            }
-        }
-        if self.get {
-            out.write_arg(b"GET");
-        }
-        if let Some(ref expiration) = self.expiration {
-            match expiration {
-                SetExpiry::EX(secs) => {
-                    out.write_arg(b"EX");
-                    out.write_arg(format!("{}", secs).as_bytes());
-                }
-                SetExpiry::PX(millis) => {
-                    out.write_arg(b"PX");
-                    out.write_arg(format!("{}", millis).as_bytes());
-                }
-                SetExpiry::EXAT(unix_time) => {
-                    out.write_arg(b"EXAT");
-                    out.write_arg(format!("{}", unix_time).as_bytes());
-                }
-                SetExpiry::PXAT(unix_time) => {
-                    out.write_arg(b"PXAT");
-                    out.write_arg(format!("{}", unix_time).as_bytes());
-                }
-                SetExpiry::KEEPTTL => {
-                    out.write_arg(b"KEEPTTL");
-                }
-            }
-        }
     }
 }

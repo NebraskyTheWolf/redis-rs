@@ -62,7 +62,6 @@
 //! * `cluster-async`: enables async redis cluster support (optional)
 //! * `tokio-comp`: enables support for tokio (optional)
 //! * `connection-manager`: enables support for automatic reconnection (optional)
-//! * `keep-alive`: enables keep-alive option on socket by means of `socket2` crate (optional)
 //!
 //! ## Connection Parameters
 //!
@@ -175,7 +174,7 @@
 //! be used with `SCAN` like commands in which case iteration will send more
 //! queries until the cursor is exhausted:
 //!
-//! ```rust,ignore
+//! ```rust,no_run
 //! # fn do_something() -> redis::RedisResult<()> {
 //! # let client = redis::Client::open("redis://127.0.0.1/").unwrap();
 //! # let mut con = client.get_connection().unwrap();
@@ -327,7 +326,7 @@ In addition to the synchronous interface that's been explained above there also 
 asynchronous interface based on [`futures`][] and [`tokio`][].
 
 This interface exists under the `aio` (async io) module (which requires that the `aio` feature
-is enabled) and largely mirrors the synchronous with a few concessions to make it fit the
+is enabled) and largely mirrors the synchronous with a few concessions to make it fit the 
 constraints of `futures`.
 
 ```rust,no_run
@@ -364,12 +363,10 @@ assert_eq!(result, Ok(("foo".to_string(), b"bar".to_vec())));
 // public api
 pub use crate::client::Client;
 pub use crate::cmd::{cmd, pack_command, pipe, Arg, Cmd, Iter};
-pub use crate::commands::{
-    Commands, ControlFlow, Direction, LposOptions, PubSubCommands, SetOptions,
-};
+pub use crate::commands::{Commands, ControlFlow, Direction, LposOptions, PubSubCommands};
 pub use crate::connection::{
     parse_redis_url, transaction, Connection, ConnectionAddr, ConnectionInfo, ConnectionLike,
-    IntoConnectionInfo, Msg, PubSub, RedisConnectionInfo, TlsMode,
+    IntoConnectionInfo, Msg, PubSub, RedisConnectionInfo,
 };
 pub use crate::parser::{parse_redis_value, Parser};
 pub use crate::pipeline::Pipeline;
@@ -394,8 +391,6 @@ pub use crate::types::{
     InfoDict,
     NumericBehavior,
     Expiry,
-    SetExpiry,
-    ExistenceCheck,
 
     // error and result types
     RedisError,
@@ -444,9 +439,8 @@ mod cluster_client;
 #[cfg(feature = "cluster")]
 mod cluster_pipeline;
 
-/// Routing information for cluster commands.
 #[cfg(feature = "cluster")]
-pub mod cluster_routing;
+mod cluster_routing;
 
 #[cfg(feature = "r2d2")]
 #[cfg_attr(docsrs, doc(cfg(feature = "r2d2")))]
@@ -458,15 +452,6 @@ pub mod streams;
 
 #[cfg(feature = "cluster-async")]
 pub mod cluster_async;
-
-#[cfg(feature = "sentinel")]
-pub mod sentinel;
-
-#[cfg(feature = "tls-rustls")]
-mod tls;
-
-#[cfg(feature = "tls-rustls")]
-pub use crate::tls::{ClientTlsConfig, TlsCertificates};
 
 mod client;
 mod cmd;

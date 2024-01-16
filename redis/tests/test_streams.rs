@@ -11,6 +11,16 @@ use std::str;
 use std::thread::sleep;
 use std::time::Duration;
 
+macro_rules! assert_args {
+    ($value:expr, $($args:expr),+) => {
+        let args = $value.to_redis_args();
+        let strings: Vec<_> = args.iter()
+                                .map(|a| str::from_utf8(a.as_ref()).unwrap())
+                                .collect();
+        assert_eq!(strings, vec![$($args),+]);
+    }
+}
+
 fn xadd(con: &mut Connection) {
     let _: RedisResult<String> =
         con.xadd("k1", "1000-0", &[("hello", "world"), ("redis", "streams")]);
@@ -74,14 +84,14 @@ fn test_cmd_options() {
 
     assert_args!(
         &opts,
-        "GROUP",
-        "group-name",
-        "consumer-name",
         "BLOCK",
         "100",
         "COUNT",
         "200",
-        "NOACK"
+        "NOACK",
+        "GROUP",
+        "group-name",
+        "consumer-name"
     );
 
     // should skip noack because of missing group(,)
@@ -136,9 +146,9 @@ fn test_assorted_1() {
     let _: RedisResult<String> = con.xadd_map("k3", "3000-0", map);
 
     let reply: StreamRangeReply = con.xrange_all("k3").unwrap();
-    assert!(reply.ids[0].contains_key("ab"));
-    assert!(reply.ids[0].contains_key("ef"));
-    assert!(reply.ids[0].contains_key("ij"));
+    assert!(reply.ids[0].contains_key(&"ab"));
+    assert!(reply.ids[0].contains_key(&"ef"));
+    assert!(reply.ids[0].contains_key(&"ij"));
 
     // test xadd w/ maxlength below...
 

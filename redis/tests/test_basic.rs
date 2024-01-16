@@ -1,8 +1,8 @@
 #![allow(clippy::let_unit_value)]
 
 use redis::{
-    Commands, ConnectionInfo, ConnectionLike, ControlFlow, ErrorKind, ExistenceCheck, Expiry,
-    PubSubCommands, RedisResult, SetExpiry, SetOptions, ToRedisArgs,
+    Commands, ConnectionInfo, ConnectionLike, ControlFlow, ErrorKind, Expiry, PubSubCommands,
+    RedisResult,
 };
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -55,52 +55,6 @@ fn test_getset() {
         redis::cmd("GET").arg("bar").query(&mut con),
         Ok(b"foo".to_vec())
     );
-}
-
-//unit test for key_type function
-#[test]
-fn test_key_type() {
-    let ctx = TestContext::new();
-    let mut con = ctx.connection();
-
-    //The key is a simple value
-    redis::cmd("SET").arg("foo").arg(42).execute(&mut con);
-    let string_key_type: String = con.key_type("foo").unwrap();
-    assert_eq!(string_key_type, "string");
-
-    //The key is a list
-    redis::cmd("LPUSH")
-        .arg("list_bar")
-        .arg("foo")
-        .execute(&mut con);
-    let list_key_type: String = con.key_type("list_bar").unwrap();
-    assert_eq!(list_key_type, "list");
-
-    //The key is a set
-    redis::cmd("SADD")
-        .arg("set_bar")
-        .arg("foo")
-        .execute(&mut con);
-    let set_key_type: String = con.key_type("set_bar").unwrap();
-    assert_eq!(set_key_type, "set");
-
-    //The key is a sorted set
-    redis::cmd("ZADD")
-        .arg("sorted_set_bar")
-        .arg("1")
-        .arg("foo")
-        .execute(&mut con);
-    let zset_key_type: String = con.key_type("sorted_set_bar").unwrap();
-    assert_eq!(zset_key_type, "zset");
-
-    //The key is a hash
-    redis::cmd("HSET")
-        .arg("hset_bar")
-        .arg("hset_key_1")
-        .arg("foo")
-        .execute(&mut con);
-    let hash_key_type: String = con.key_type("hset_bar").unwrap();
-    assert_eq!(hash_key_type, "hash");
 }
 
 #[test]
@@ -653,64 +607,6 @@ fn test_pubsub_unsubscribe() {
 }
 
 #[test]
-fn test_pubsub_subscribe_while_messages_are_sent() {
-    let ctx = TestContext::new();
-    let mut conn_external = ctx.connection();
-    let mut conn_internal = ctx.connection();
-    let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let received_clone = received.clone();
-    let (sender, receiver) = std::sync::mpsc::channel();
-    // receive message from foo channel
-    let thread = std::thread::spawn(move || {
-        let mut pubsub = conn_internal.as_pubsub();
-        pubsub.subscribe("foo").unwrap();
-        sender.send(()).unwrap();
-        loop {
-            let msg = pubsub.get_message().unwrap();
-            let channel = msg.get_channel_name();
-            let content: i32 = msg.get_payload().unwrap();
-            received
-                .lock()
-                .unwrap()
-                .push(format!("{channel}:{content}"));
-            if content == -1 {
-                return;
-            }
-            if content == 5 {
-                // subscribe bar channel using the same pubsub
-                pubsub.subscribe("bar").unwrap();
-                sender.send(()).unwrap();
-            }
-        }
-    });
-    receiver.recv().unwrap();
-
-    // send message to foo channel after channel is ready.
-    for index in 0..10 {
-        println!("publishing on foo {index}");
-        redis::cmd("PUBLISH")
-            .arg("foo")
-            .arg(index)
-            .query::<i32>(&mut conn_external)
-            .unwrap();
-    }
-    receiver.recv().unwrap();
-    redis::cmd("PUBLISH")
-        .arg("bar")
-        .arg(-1)
-        .query::<i32>(&mut conn_external)
-        .unwrap();
-    thread.join().unwrap();
-    assert_eq!(
-        *received_clone.lock().unwrap(),
-        (0..10)
-            .map(|index| format!("foo:{}", index))
-            .chain(std::iter::once("bar:-1".to_string()))
-            .collect::<Vec<_>>()
-    );
-}
-
-#[test]
 fn test_pubsub_unsubscribe_no_subs() {
     let ctx = TestContext::new();
     let mut con = ctx.connection();
@@ -1212,35 +1108,6 @@ fn test_zrandmember() {
 }
 
 #[test]
-fn test_sismember() {
-    let ctx = TestContext::new();
-    let mut con = ctx.connection();
-
-    let setname = "myset";
-    assert_eq!(con.sadd(setname, &["a"]), Ok(1));
-
-    let result: bool = con.sismember(setname, &["a"]).unwrap();
-    assert!(result);
-
-    let result: bool = con.sismember(setname, &["b"]).unwrap();
-    assert!(!result);
-}
-
-// Requires redis-server >= 6.2.0.
-// Not supported with the current appveyor/windows binary deployed.
-#[cfg(not(target_os = "windows"))]
-#[test]
-fn test_smismember() {
-    let ctx = TestContext::new();
-    let mut con = ctx.connection();
-
-    let setname = "myset";
-    assert_eq!(con.sadd(setname, &["a", "b", "c"]), Ok(3));
-    let results: Vec<bool> = con.smismember(setname, &["0", "a", "b", "c", "x"]).unwrap();
-    assert_eq!(results, vec![false, true, true, true, false]);
-}
-
-#[test]
 fn test_object_commands() {
     let ctx = TestContext::new();
     let mut con = ctx.connection();
@@ -1316,110 +1183,4 @@ fn test_multi_generics() {
     assert_eq!(con.sadd(999_i64, vec![42, 123]), Ok(2));
     let _: () = con.rename(999_i64, b"set2").unwrap();
     assert_eq!(con.sunionstore("res", &[b"set1", b"set2"]), Ok(3));
-}
-
-#[test]
-fn test_set_options_with_get() {
-    let ctx = TestContext::new();
-    let mut con = ctx.connection();
-
-    let opts = SetOptions::default().get(true);
-    let data: Option<String> = con.set_options(1, "1", opts).unwrap();
-    assert_eq!(data, None);
-
-    let opts = SetOptions::default().get(true);
-    let data: Option<String> = con.set_options(1, "1", opts).unwrap();
-    assert_eq!(data, Some("1".to_string()));
-}
-
-#[test]
-fn test_set_options_options() {
-    let empty = SetOptions::default();
-    assert_eq!(ToRedisArgs::to_redis_args(&empty).len(), 0);
-
-    let opts = SetOptions::default()
-        .conditional_set(ExistenceCheck::NX)
-        .get(true)
-        .with_expiration(SetExpiry::PX(1000));
-
-    assert_args!(&opts, "NX", "GET", "PX", "1000");
-
-    let opts = SetOptions::default()
-        .conditional_set(ExistenceCheck::XX)
-        .get(true)
-        .with_expiration(SetExpiry::PX(1000));
-
-    assert_args!(&opts, "XX", "GET", "PX", "1000");
-
-    let opts = SetOptions::default()
-        .conditional_set(ExistenceCheck::XX)
-        .with_expiration(SetExpiry::KEEPTTL);
-
-    assert_args!(&opts, "XX", "KEEPTTL");
-
-    let opts = SetOptions::default()
-        .conditional_set(ExistenceCheck::XX)
-        .with_expiration(SetExpiry::EXAT(100));
-
-    assert_args!(&opts, "XX", "EXAT", "100");
-
-    let opts = SetOptions::default().with_expiration(SetExpiry::EX(1000));
-
-    assert_args!(&opts, "EX", "1000");
-}
-
-#[test]
-fn test_blocking_sorted_set_api() {
-    let ctx = TestContext::new();
-    let mut con = ctx.connection();
-
-    // setup version & input data followed by assertions that take into account Redis version
-    // BZPOPMIN & BZPOPMAX are available from Redis version 5.0.0
-    // BZMPOP is available from Redis version 7.0.0
-
-    let redis_version = ctx.get_version();
-    assert!(redis_version.0 >= 5);
-
-    assert_eq!(con.zadd("a", "1a", 1), Ok(()));
-    assert_eq!(con.zadd("b", "2b", 2), Ok(()));
-    assert_eq!(con.zadd("c", "3c", 3), Ok(()));
-    assert_eq!(con.zadd("d", "4d", 4), Ok(()));
-    assert_eq!(con.zadd("a", "5a", 5), Ok(()));
-    assert_eq!(con.zadd("b", "6b", 6), Ok(()));
-    assert_eq!(con.zadd("c", "7c", 7), Ok(()));
-    assert_eq!(con.zadd("d", "8d", 8), Ok(()));
-
-    let min = con.bzpopmin::<&str, (String, String, String)>("b", 0.0);
-    let max = con.bzpopmax::<&str, (String, String, String)>("b", 0.0);
-
-    assert_eq!(
-        min.unwrap(),
-        (String::from("b"), String::from("2b"), String::from("2"))
-    );
-    assert_eq!(
-        max.unwrap(),
-        (String::from("b"), String::from("6b"), String::from("6"))
-    );
-
-    if redis_version.0 >= 7 {
-        let min = con.bzmpop_min::<&str, (String, Vec<Vec<(String, String)>>)>(
-            0.0,
-            vec!["a", "b", "c", "d"].as_slice(),
-            1,
-        );
-        let max = con.bzmpop_max::<&str, (String, Vec<Vec<(String, String)>>)>(
-            0.0,
-            vec!["a", "b", "c", "d"].as_slice(),
-            1,
-        );
-
-        assert_eq!(
-            min.unwrap().1[0][0],
-            (String::from("1a"), String::from("1"))
-        );
-        assert_eq!(
-            max.unwrap().1[0][0],
-            (String::from("5a"), String::from("5"))
-        );
-    }
 }

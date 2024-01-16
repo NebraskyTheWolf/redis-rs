@@ -179,16 +179,6 @@ impl ToRedisArgs for StreamReadOptions {
     where
         W: ?Sized + RedisWrite,
     {
-        if let Some(ref group) = self.group {
-            out.write_arg(b"GROUP");
-            for i in &group.0 {
-                out.write_arg(i);
-            }
-            for i in &group.1 {
-                out.write_arg(i);
-            }
-        }
-
         if let Some(ref ms) = self.block {
             out.write_arg(b"BLOCK");
             out.write_arg(format!("{ms}").as_bytes());
@@ -199,10 +189,18 @@ impl ToRedisArgs for StreamReadOptions {
             out.write_arg(format!("{n}").as_bytes());
         }
 
-        if self.group.is_some() {
+        if let Some(ref group) = self.group {
             // noack is only available w/ xreadgroup
             if self.noack == Some(true) {
                 out.write_arg(b"NOACK");
+            }
+
+            out.write_arg(b"GROUP");
+            for i in &group.0 {
+                out.write_arg(i);
+            }
+            for i in &group.1 {
+                out.write_arg(i);
             }
         }
     }
@@ -255,13 +253,18 @@ pub struct StreamClaimReply {
 ///
 /// [`xpending`]: ../trait.Commands.html#method.xpending
 ///
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub enum StreamPendingReply {
     /// The stream is empty.
-    #[default]
     Empty,
     /// Data with payload exists in the stream.
     Data(StreamPendingData),
+}
+
+impl Default for StreamPendingReply {
+    fn default() -> StreamPendingReply {
+        StreamPendingReply::Empty
+    }
 }
 
 impl StreamPendingReply {
@@ -429,7 +432,7 @@ impl StreamId {
     fn from_bulk_value(v: &Value) -> RedisResult<Self> {
         let mut stream_id = StreamId::default();
         if let Value::Bulk(ref values) = *v {
-            if let Some(v) = values.first() {
+            if let Some(v) = values.get(0) {
                 stream_id.id = from_redis_value(v)?;
             }
             if let Some(v) = values.get(1) {
@@ -450,8 +453,8 @@ impl StreamId {
     }
 
     /// Does the message contain a particular field?
-    pub fn contains_key(&self, key: &str) -> bool {
-        self.map.get(key).is_some()
+    pub fn contains_key(&self, key: &&str) -> bool {
+        self.map.get(*key).is_some()
     }
 
     /// Returns how many field/value pairs exist in this message.

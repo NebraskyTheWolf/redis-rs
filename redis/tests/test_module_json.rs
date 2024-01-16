@@ -19,11 +19,9 @@ use serde_json::{self, json};
 
 const TEST_KEY: &str = "my_json";
 
-const MTLS_NOT_ENABLED: bool = false;
-
 #[test]
 fn test_module_json_serialize_error() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     #[derive(Debug, Serialize)]
@@ -32,14 +30,14 @@ fn test_module_json_serialize_error() {
         // so numbers and strings, anything else will cause the serialization to fail
         // this is basically the only way to make a serialization fail at runtime
         // since rust doesnt provide the necessary ability to enforce this
-        pub invalid_json: HashMap<Option<bool>, i64>,
+        pub invalid_json: HashMap<bool, i64>,
     }
 
     let mut test_invalid_value: InvalidSerializedStruct = InvalidSerializedStruct {
         invalid_json: HashMap::new(),
     };
 
-    test_invalid_value.invalid_json.insert(None, 2i64);
+    test_invalid_value.invalid_json.insert(true, 2i64);
 
     let set_invalid: RedisResult<bool> = con.json_set(TEST_KEY, "$", &test_invalid_value);
 
@@ -55,7 +53,7 @@ fn test_module_json_serialize_error() {
 
 #[test]
 fn test_module_json_arr_append() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -73,7 +71,7 @@ fn test_module_json_arr_append() {
 
 #[test]
 fn test_module_json_arr_index() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -104,7 +102,7 @@ fn test_module_json_arr_index() {
 
 #[test]
 fn test_module_json_arr_insert() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -134,7 +132,7 @@ fn test_module_json_arr_insert() {
 
 #[test]
 fn test_module_json_arr_len() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -164,7 +162,7 @@ fn test_module_json_arr_len() {
 
 #[test]
 fn test_module_json_arr_pop() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -204,7 +202,7 @@ fn test_module_json_arr_pop() {
 
 #[test]
 fn test_module_json_arr_trim() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -234,7 +232,7 @@ fn test_module_json_arr_trim() {
 
 #[test]
 fn test_module_json_clear() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(TEST_KEY, "$", &json!({"obj": {"a": 1i64, "b": 2i64}, "arr": [1i64, 2i64, 3i64], "str": "foo", "bool": true, "int": 42i64, "float": std::f64::consts::PI}));
@@ -259,7 +257,7 @@ fn test_module_json_clear() {
 
 #[test]
 fn test_module_json_del() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -277,7 +275,7 @@ fn test_module_json_del() {
 
 #[test]
 fn test_module_json_get() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -303,7 +301,7 @@ fn test_module_json_get() {
 
 #[test]
 fn test_module_json_mget() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial_a: RedisResult<bool> = con.json_set(
@@ -336,7 +334,7 @@ fn test_module_json_mget() {
 
 #[test]
 fn test_module_json_num_incr_by() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -360,7 +358,7 @@ fn test_module_json_num_incr_by() {
 
 #[test]
 fn test_module_json_obj_keys() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -387,7 +385,7 @@ fn test_module_json_obj_keys() {
 
 #[test]
 fn test_module_json_obj_len() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -405,7 +403,7 @@ fn test_module_json_obj_len() {
 
 #[test]
 fn test_module_json_set() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set: RedisResult<bool> = con.json_set(TEST_KEY, "$", &json!({"key": "value"}));
@@ -415,7 +413,7 @@ fn test_module_json_set() {
 
 #[test]
 fn test_module_json_str_append() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -440,7 +438,7 @@ fn test_module_json_str_append() {
 
 #[test]
 fn test_module_json_str_len() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
@@ -458,7 +456,7 @@ fn test_module_json_str_len() {
 
 #[test]
 fn test_module_json_toggle() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(TEST_KEY, "$", &json!({"bool": true}));
@@ -474,7 +472,7 @@ fn test_module_json_toggle() {
 
 #[test]
 fn test_module_json_type() {
-    let ctx = TestContext::with_modules(&[Module::Json], MTLS_NOT_ENABLED);
+    let ctx = TestContext::with_modules(&[Module::Json]);
     let mut con = ctx.connection();
 
     let set_initial: RedisResult<bool> = con.json_set(
