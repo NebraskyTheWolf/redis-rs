@@ -19,6 +19,6 @@ futures = { version = "0.3", optional = true }
 aio = ["futures", "redis/aio"]
 
 [dev-dependencies]
-redis = { version = "0.23.0", path = "../redis", features = ["aio", "tokio-comp"] }
+redis = { version = "0.23.0", path = "../fluffici_redis", features = ["aio", "tokio-comp"] }
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
 
