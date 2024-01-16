@@ -1,3 +1,3 @@
 [workspace]
 resolver = "2"
-members = ["redis", "redis-test"]
+members = ["fluffici_redis", "redis-test"]
